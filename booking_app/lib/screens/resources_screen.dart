@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import '../services/db_service.dart';
 import '../models/resource.dart';
 
@@ -21,42 +22,43 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
 
   Future<void> _loadResources() async {
     setState(() => _loading = true);
-    List<Resource> list = await DatabaseService.getResources();
-    setState(() {
-      _resources = list;
-      _loading = false;
-    });
+    _resources = await DatabaseService.getResources();
+    setState(() => _loading = false);
   }
 
   Future<void> _addResource() async {
-    String name = _nameController.text.trim();
+    final name = _nameController.text.trim();
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Resource name cannot be empty')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Resource name cannot be empty')),
+      );
       return;
     }
-    int? newId = await DatabaseService.insertResource(name);
+    final newId = await DatabaseService.insertResource(name);
     if (newId != null && newId > 0) {
       setState(() {
         _resources.add(Resource(id: newId, name: name));
         _changesMade = true;
         _nameController.clear();
       });
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Resource added')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Resource added')),
+      );
     } else {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Error: Could not add resource')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: Could not add resource')),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      // Pop bei Zurück-Geste verhindern und selbst manuell poppen
-      canPop: false,
-      onPopInvoked: (didPop) {
-        Navigator.pop(context, _changesMade);
+      canPop: true,
+      onPopInvoked: (didPop) async {
+        if (!didPop) {
+          Navigator.pop(context, _changesMade);
+        }
       },
       child: Scaffold(
         appBar: AppBar(title: Text('Resources')),
@@ -100,15 +102,17 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
                       onDismissed: (direction) async {
                         final removed = res;
                         setState(() => _resources.removeAt(i));
-                        bool ok = await DatabaseService.deleteResource(removed.id!);
+                        final ok = await DatabaseService.deleteResource(removed.id!);
                         if (!ok) {
                           setState(() => _resources.insert(i, removed));
                           ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Could not delete resource')));
+                            SnackBar(content: Text('Could not delete resource')),
+                          );
                         } else {
                           _changesMade = true;
                           ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Resource deleted')));
+                            SnackBar(content: Text('Resource deleted')),
+                          );
                         }
                       },
                       child: ListTile(title: Text(res.name)),
