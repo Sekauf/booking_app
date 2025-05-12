@@ -20,57 +20,50 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
   }
 
   Future<void> _loadResources() async {
+    setState(() => _loading = true);
+    List<Resource> list = await DatabaseService.getResources();
     setState(() {
-      _loading = true;
-    });
-    List<Resource> resList = await DatabaseService.getResources();
-    setState(() {
-      _resources = resList;
+      _resources = list;
       _loading = false;
     });
   }
 
-  void _addResource() async {
+  Future<void> _addResource() async {
     String name = _nameController.text.trim();
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Resource name cannot be empty')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Resource name cannot be empty')));
       return;
     }
     int? newId = await DatabaseService.insertResource(name);
     if (newId != null && newId > 0) {
       setState(() {
         _resources.add(Resource(id: newId, name: name));
+        _changesMade = true;
+        _nameController.clear();
       });
-      _nameController.clear();
-      _changesMade = true;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Resource added')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Resource added')));
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: Could not add resource')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Error: Could not add resource')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
-        // Return whether changes were made when popping
+    return PopScope(
+      // Pop bei Zurück-Geste verhindern und selbst manuell poppen
+      canPop: false,
+      onPopInvoked: (didPop) {
         Navigator.pop(context, _changesMade);
-        return false;
       },
       child: Scaffold(
-        appBar: AppBar(
-          title: Text('Resources'),
-        ),
+        appBar: AppBar(title: Text('Resources')),
         body: _loading
             ? Center(child: CircularProgressIndicator())
             : Padding(
-          padding: EdgeInsets.all(16.0),
+          padding: EdgeInsets.all(16),
           child: Column(
             children: [
               TextField(
@@ -88,8 +81,8 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
                     ? Center(child: Text('No resources added yet.'))
                     : ListView.builder(
                   itemCount: _resources.length,
-                  itemBuilder: (context, index) {
-                    final res = _resources[index];
+                  itemBuilder: (ctx, i) {
+                    final res = _resources[i];
                     return Dismissible(
                       key: Key(res.id.toString()),
                       background: Container(
@@ -105,29 +98,20 @@ class _ResourcesScreenState extends State<ResourcesScreen> {
                         child: Icon(Icons.delete, color: Colors.white),
                       ),
                       onDismissed: (direction) async {
-                        final removedRes = res;
-                        setState(() {
-                          _resources.removeAt(index);
-                        });
-                        bool success = await DatabaseService.deleteResource(removedRes.id!);
-                        if (!success) {
-                          // Deletion failed (e.g., constraint issue); restore item
-                          setState(() {
-                            _resources.insert(index, removedRes);
-                          });
+                        final removed = res;
+                        setState(() => _resources.removeAt(i));
+                        bool ok = await DatabaseService.deleteResource(removed.id!);
+                        if (!ok) {
+                          setState(() => _resources.insert(i, removed));
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Error: Could not delete resource')),
-                          );
+                              SnackBar(content: Text('Could not delete resource')));
                         } else {
                           _changesMade = true;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Resource deleted')),
-                          );
+                              SnackBar(content: Text('Resource deleted')));
                         }
                       },
-                      child: ListTile(
-                        title: Text(res.name),
-                      ),
+                      child: ListTile(title: Text(res.name)),
                     );
                   },
                 ),
