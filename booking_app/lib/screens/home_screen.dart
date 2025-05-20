@@ -1,7 +1,10 @@
+// lib/screens/home_screen.dart
 import 'package:flutter/material.dart';
-import 'reservation_list.dart';
-import 'reservation_form.dart';
-import 'statistics_screen.dart';
+import '../models/reservation.dart';
+import '../services/database_service.dart';
+import '../screens/statistics_screen.dart';
+import '../screens/reservation_list_screen.dart';
+import '../screens/reservation_form_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -10,47 +13,60 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
+// In home_screen.dart
 class _HomeScreenState extends State<HomeScreen> {
-  // Callback, um die Liste nach Änderungen zu aktualisieren
-  void _refresh() {
+  int _selectedIndex = 0;
+
+  // Methode zum Aktualisieren der Daten (wenn nötig)
+  void _refreshData() {
     setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Reservierungen'),
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: [
+          ReservationListScreen(
+            onReservationChanged: _refreshData,
+          ),
+          FutureBuilder<List<Reservation>>(
+            future: DatabaseService().getAllReservations(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final reservations = snapshot.data ?? [];
+              return StatisticsScreen(reservations: reservations);
+            },
+          ),
+        ],
       ),
-      // Seitenleiste für Navigation (z.B. Statistik)
-      drawer: Drawer(
-        child: ListView(
-          children: [
-            const DrawerHeader(child: Text('Menü', style: TextStyle(fontSize: 18))),
-            ListTile(
-              title: const Text('Statistiken'),
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const StatisticsScreen()),
-                );
-              },
-            ),
-          ],
-        ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: (index) => setState(() => _selectedIndex = index),
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.list),
+            label: 'Reservierungen',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.analytics),
+            label: 'Statistiken',
+          ),
+        ],
       ),
-      // Hauptinhalt: Liste der Reservierungen
-      body: ReservationList(onReservationChanged: _refresh),
-      // FAB zum Anlegen einer neuen Reservierung
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          // Öffne Formular ohne übergebene Reservierung (Neuanlage)
-          await Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const ReservationForm()),
-          );
-          _refresh();
-        },
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: _selectedIndex == 0
+          ? FloatingActionButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const ReservationFormScreen(),
+                ),
+              ),
+              child: const Icon(Icons.add),
+            )
+          : null,
     );
   }
 }

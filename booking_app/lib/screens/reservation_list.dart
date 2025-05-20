@@ -46,7 +46,7 @@ class ReservationList extends StatelessWidget {
                 title: Text(res.name),
                 // Untertitel: Tischnummer und Datum/Uhrzeit
                 subtitle: Text(
-                  'Tisch ${res.table} – ${res.dateTime.toLocal()}'.split('.').first,
+                  'Tisch ${res.tableNumber} – ${res.dateTime.toLocal()}'.split('.').first,  // Geändert von table
                 ),
                 // Tippen öffnet das Formular zum Bearbeiten
                 onTap: () async {

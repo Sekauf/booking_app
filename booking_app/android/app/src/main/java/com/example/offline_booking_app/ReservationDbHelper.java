@@ -1,158 +1,133 @@
-package com.example.offline_booking_app;
+package com.example.booking_app;  // Geändertes Package
 
+import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
-import android.content.ContentValues;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 public class ReservationDbHelper extends SQLiteOpenHelper {
     private static final String DATABASE_NAME = "reservations.db";
     private static final int DATABASE_VERSION = 1;
 
-    // Table names
-    public static final String TABLE_RESOURCES = "resources";
-    public static final String TABLE_RESERVATIONS = "reservations";
-    // Columns for resources
-    public static final String COL_RES_ID = "id";
-    public static final String COL_RES_NAME = "name";
-    // Columns for reservations
-    public static final String COL_RESERV_ID = "id";
-    public static final String COL_RESERV_RESOURCE_ID = "resource_id";
-    public static final String COL_RESERV_DATE = "date";
-    public static final String COL_RESERV_DESC = "description";
+    private static final String TABLE_RESERVATIONS = "reservations";
+    private static final String COLUMN_ID = "id";
+    private static final String COLUMN_NAME = "name";
+    private static final String COLUMN_TABLE = "tableNumber";
+    private static final String COLUMN_DATETIME = "dateTime";
+    private static final String COLUMN_START = "start";
+    private static final String COLUMN_END = "end";
 
     public ReservationDbHelper(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
     }
 
     @Override
-    public void onConfigure(SQLiteDatabase db) {
-        super.onConfigure(db);
-        // Enable foreign key constraints
-        db.setForeignKeyConstraintsEnabled(true);
-    }
-
-    @Override
     public void onCreate(SQLiteDatabase db) {
-        // Create resources table
-        String createResources = "CREATE TABLE " + TABLE_RESOURCES + " (" +
-                COL_RES_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                COL_RES_NAME + " TEXT NOT NULL" +
-                ")";
-        // Create reservations table with foreign key reference to resources
-        String createReservations = "CREATE TABLE " + TABLE_RESERVATIONS + " (" +
-                COL_RESERV_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                COL_RESERV_RESOURCE_ID + " INTEGER NOT NULL, " +
-                COL_RESERV_DATE + " INTEGER NOT NULL, " +
-                COL_RESERV_DESC + " TEXT, " +
-                "FOREIGN KEY(" + COL_RESERV_RESOURCE_ID + ") REFERENCES " + TABLE_RESOURCES + "(" + COL_RES_ID + ") ON DELETE CASCADE" +
-                ")";
-        db.execSQL(createResources);
-        db.execSQL(createReservations);
+        String CREATE_RESERVATIONS_TABLE = "CREATE TABLE " + TABLE_RESERVATIONS + "("
+                + COLUMN_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
+                + COLUMN_NAME + " TEXT NOT NULL,"
+                + COLUMN_TABLE + " INTEGER NOT NULL,"
+                + COLUMN_DATETIME + " INTEGER NOT NULL,"
+                + COLUMN_START + " INTEGER NOT NULL,"
+                + COLUMN_END + " INTEGER NOT NULL"
+                + ")";
+        db.execSQL(CREATE_RESERVATIONS_TABLE);
     }
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        // Drop existing tables and recreate (simple strategy for now)
         db.execSQL("DROP TABLE IF EXISTS " + TABLE_RESERVATIONS);
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_RESOURCES);
         onCreate(db);
     }
 
-    public long insertResource(String name) {
+    public long addReservation(Map<String, Object> reservation) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues values = new ContentValues();
-        values.put(COL_RES_NAME, name);
-        return db.insert(TABLE_RESOURCES, null, values);
+        
+        values.put(COLUMN_NAME, (String) reservation.get("name"));
+        values.put(COLUMN_TABLE, (Integer) reservation.get("tableNumber"));
+        values.put(COLUMN_DATETIME, (Long) reservation.get("dateTime"));
+        values.put(COLUMN_START, (Long) reservation.get("start"));
+        values.put(COLUMN_END, (Long) reservation.get("end"));
+
+        long id = db.insert(TABLE_RESERVATIONS, null, values);
+        db.close();
+        return id;
     }
 
-    public long insertReservation(int resourceId, long dateMillis, String description) {
+    public ArrayList<Map<String, Object>> getAllReservations() {
+        ArrayList<Map<String, Object>> reservations = new ArrayList<>();
+        String selectQuery = "SELECT * FROM " + TABLE_RESERVATIONS;
+        
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.rawQuery(selectQuery, null);
+
+        if (cursor.moveToFirst()) {
+            do {
+                Map<String, Object> reservation = new HashMap<>();
+                reservation.put(COLUMN_ID, cursor.getInt(cursor.getColumnIndex(COLUMN_ID)));
+                reservation.put(COLUMN_NAME, cursor.getString(cursor.getColumnIndex(COLUMN_NAME)));
+                reservation.put(COLUMN_TABLE, cursor.getInt(cursor.getColumnIndex(COLUMN_TABLE)));
+                reservation.put(COLUMN_DATETIME, cursor.getLong(cursor.getColumnIndex(COLUMN_DATETIME)));
+                reservation.put(COLUMN_START, cursor.getLong(cursor.getColumnIndex(COLUMN_START)));
+                reservation.put(COLUMN_END, cursor.getLong(cursor.getColumnIndex(COLUMN_END)));
+                reservations.add(reservation);
+            } while (cursor.moveToNext());
+        }
+
+        cursor.close();
+        db.close();
+        return reservations;
+    }
+
+    public int updateReservation(Map<String, Object> reservation) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues values = new ContentValues();
-        values.put(COL_RESERV_RESOURCE_ID, resourceId);
-        values.put(COL_RESERV_DATE, dateMillis);
-        values.put(COL_RESERV_DESC, description);
-        return db.insert(TABLE_RESERVATIONS, null, values);
+
+        values.put(COLUMN_NAME, (String) reservation.get("name"));
+        values.put(COLUMN_TABLE, (Integer) reservation.get("tableNumber"));
+        values.put(COLUMN_DATETIME, (Long) reservation.get("dateTime"));
+        values.put(COLUMN_START, (Long) reservation.get("start"));
+        values.put(COLUMN_END, (Long) reservation.get("end"));
+
+        int rowsAffected = db.update(TABLE_RESERVATIONS, values,
+                COLUMN_ID + " = ?",
+                new String[]{String.valueOf(reservation.get("id"))});
+        db.close();
+        return rowsAffected;
     }
 
-    public boolean deleteReservation(int id) {
+    public void deleteReservation(int id) {
         SQLiteDatabase db = this.getWritableDatabase();
-        int rows = db.delete(TABLE_RESERVATIONS, COL_RESERV_ID + " = ?", new String[]{String.valueOf(id)});
-        return rows > 0;
+        db.delete(TABLE_RESERVATIONS, COLUMN_ID + " = ?",
+                new String[]{String.valueOf(id)});
+        db.close();
     }
 
-    public boolean deleteResource(int id) {
-        SQLiteDatabase db = this.getWritableDatabase();
-        int rows = db.delete(TABLE_RESOURCES, COL_RES_ID + " = ?", new String[]{String.valueOf(id)});
-        return rows > 0;
-    }
-
-    public List<Map<String, Object>> getAllResources() {
+    public boolean hasConflict(Map<String, Object> reservation) {
         SQLiteDatabase db = this.getReadableDatabase();
-        List<Map<String, Object>> resultList = new ArrayList<>();
-        Cursor cursor = db.query(TABLE_RESOURCES, new String[]{COL_RES_ID, COL_RES_NAME},
-                null, null, null, null, COL_RES_NAME + " ASC");
-        if (cursor != null) {
-            try {
-                while (cursor.moveToNext()) {
-                    Map<String, Object> map = new HashMap<>();
-                    int idIndex = cursor.getColumnIndexOrThrow(COL_RES_ID);
-                    int nameIndex = cursor.getColumnIndexOrThrow(COL_RES_NAME);
-                    map.put("id", cursor.getInt(idIndex));
-                    map.put("name", cursor.getString(nameIndex));
-                    resultList.add(map);
-                }
-            } finally {
-                cursor.close();
-            }
-        }
-        return resultList;
-    }
+        String query = "SELECT COUNT(*) FROM " + TABLE_RESERVATIONS +
+                " WHERE " + COLUMN_TABLE + " = ? AND " +
+                COLUMN_DATETIME + " = ? AND " +
+                COLUMN_ID + " != ?";
 
-    public List<Map<String, Object>> getAllReservations() {
-        SQLiteDatabase db = this.getReadableDatabase();
-        List<Map<String, Object>> resultList = new ArrayList<>();
-        String query = "SELECT res." + COL_RESERV_ID + " AS id, " +
-                "res." + COL_RESERV_RESOURCE_ID + " AS resource_id, " +
-                "res." + COL_RESERV_DATE + " AS date, " +
-                "res." + COL_RESERV_DESC + " AS description, " +
-                "r." + COL_RES_NAME + " AS resource_name " +
-                "FROM " + TABLE_RESERVATIONS + " res " +
-                "JOIN " + TABLE_RESOURCES + " r " +
-                "ON res." + COL_RESERV_RESOURCE_ID + " = r." + COL_RES_ID + " " +
-                "ORDER BY res." + COL_RESERV_DATE + " ASC";
-        Cursor cursor = db.rawQuery(query, null);
-        if (cursor != null) {
-            try {
-                int idIndex = cursor.getColumnIndexOrThrow("id");
-                int resIdIndex = cursor.getColumnIndexOrThrow("resource_id");
-                int dateIndex = cursor.getColumnIndexOrThrow("date");
-                int descIndex = cursor.getColumnIndexOrThrow("description");
-                int nameIndex = cursor.getColumnIndexOrThrow("resource_name");
-                while (cursor.moveToNext()) {
-                    Map<String, Object> map = new HashMap<>();
-                    map.put("id", cursor.getInt(idIndex));
-                    map.put("resource_id", cursor.getInt(resIdIndex));
-                    map.put("date", cursor.getLong(dateIndex));
-                    // Handle description which may be null
-                    if (!cursor.isNull(descIndex)) {
-                        map.put("description", cursor.getString(descIndex));
-                    } else {
-                        map.put("description", "");
-                    }
-                    // Resource name from joined table
-                    map.put("resource_name", cursor.getString(nameIndex));
-                    resultList.add(map);
-                }
-            } finally {
-                cursor.close();
-            }
+        Cursor cursor = db.rawQuery(query, new String[]{
+                String.valueOf(reservation.get("tableNumber")),
+                String.valueOf(reservation.get("dateTime")),
+                String.valueOf(reservation.get("id") != null ? reservation.get("id") : -1)
+        });
+
+        boolean hasConflict = false;
+        if (cursor.moveToFirst()) {
+            hasConflict = cursor.getInt(0) > 0;
         }
-        return resultList;
+
+        cursor.close();
+        db.close();
+        return hasConflict;
     }
 }

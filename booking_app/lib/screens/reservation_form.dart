@@ -18,13 +18,14 @@ class _ReservationFormState extends State<ReservationForm> {
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
 
+  // In ReservationForm, initState Methode
   @override
   void initState() {
     super.initState();
     // Wenn eine Reservierung übergeben wurde, Formular mit bestehenden Werten befüllen
     if (widget.reservation != null) {
       _nameController.text = widget.reservation!.name;
-      _selectedTable = widget.reservation!.table;
+      _selectedTable = widget.reservation!.tableNumber;  // Geändert von table
       final dt = widget.reservation!.dateTime;
       _selectedDate = DateTime(dt.year, dt.month, dt.day);
       _selectedTime = TimeOfDay(hour: dt.hour, minute: dt.minute);
@@ -37,19 +38,20 @@ class _ReservationFormState extends State<ReservationForm> {
     super.dispose();
   }
 
-  // Funktion zum Speichern (Hinzufügen oder Aktualisieren)
   Future<void> _saveReservation() async {
+    if (!mounted) return;
+    
     if (!_formKey.currentState!.validate() ||
         _selectedDate == null ||
         _selectedTime == null ||
         _selectedTable == null) {
-      // Falls Felder fehlen
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Bitte alle Felder ausfüllen!')),
       );
       return;
     }
-    // Datum und Uhrzeit kombinieren
+
     final dateTime = DateTime(
       _selectedDate!.year,
       _selectedDate!.month,
@@ -57,39 +59,48 @@ class _ReservationFormState extends State<ReservationForm> {
       _selectedTime!.hour,
       _selectedTime!.minute,
     );
-    // Neues Reservierungsobjekt
+
     final newRes = Reservation(
       id: widget.reservation?.id,
       name: _nameController.text,
-      table: _selectedTable!,
+      tableNumber: _selectedTable!,
       dateTime: dateTime,
+      start: dateTime,
+      end: dateTime.add(const Duration(hours: 2)),
     );
+
     // Prüfen auf Doppelbuchung
     final hasConflict = await DatabaseService().hasConflictingReservation(newRes);
+    if (!mounted) return;
+
     if (hasConflict) {
       // Fehlerdialog bei Konflikt
-      showDialog(
+      final shouldContinue = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Doppelbuchung'),
           content: const Text('Für diesen Tisch/Uhrzeit existiert bereits eine Reservierung.'),
           actions: [
             TextButton(
-              child: const Text('OK'),
-              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Abbrechen'),
+              onPressed: () => Navigator.of(context).pop(false),
             ),
           ],
         ),
       );
-      return;
+      
+      if (shouldContinue == null || !shouldContinue) return;
     }
-    // Je nach Modus neu anlegen oder aktualisieren
+
+    if (!mounted) return;
+
     if (widget.reservation == null) {
       await DatabaseService().addReservation(newRes);
     } else {
       await DatabaseService().updateReservation(newRes);
     }
-    // Zurück zur Liste
+
+    if (!mounted) return;
     Navigator.of(context).pop();
   }
 
