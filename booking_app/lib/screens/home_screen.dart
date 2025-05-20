@@ -1,118 +1,55 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import '../services/db_service.dart';
-import '../models/reservation.dart';
+import 'reservation_list.dart';
+import 'reservation_form.dart';
+import 'statistics_screen.dart';
 
 class HomeScreen extends StatefulWidget {
+  const HomeScreen({Key? key}) : super(key: key);
+
   @override
-  _HomeScreenState createState() => _HomeScreenState();
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  bool _loading = true;
-  List<Reservation> _reservations = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadReservations();
-  }
-
-  Future<void> _loadReservations() async {
-    setState(() {
-      _loading = true;
-    });
-    List<Reservation> resList = await DatabaseService.getReservations();
-    setState(() {
-      _reservations = resList;
-      _loading = false;
-    });
-  }
-
-  void _addReservation() async {
-    final result = await Navigator.pushNamed(context, '/addReservation');
-    if (result == true) {
-      _loadReservations();
-    }
-  }
-
-  void _manageResources() async {
-    final result = await Navigator.pushNamed(context, '/resources');
-    if (result == true) {
-      // If resources were changed (added/deleted), reload reservations in case it affects list
-      _loadReservations();
-    }
+  // Callback, um die Liste nach Änderungen zu aktualisieren
+  void _refresh() {
+    setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Reservations'),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.settings),
-            tooltip: 'Manage Resources',
-            onPressed: _manageResources,
-          ),
-        ],
+        title: const Text('Reservierungen'),
       ),
-      body: _loading
-          ? Center(child: CircularProgressIndicator())
-          : _reservations.isEmpty
-          ? Center(child: Text('No reservations available.'))
-          : RefreshIndicator(
-        onRefresh: () async {
-          await _loadReservations();
-        },
-        child: ListView.builder(
-          itemCount: _reservations.length,
-          itemBuilder: (context, index) {
-            final reservation = _reservations[index];
-            final resourceName = reservation.resourceName ?? 'Resource ${reservation.resourceId}';
-            final formattedDate = DateFormat('dd.MM.yyyy').format(reservation.date);
-            return Dismissible(
-              key: Key(reservation.id.toString()),
-              background: Container(
-                color: Colors.red,
-                alignment: Alignment.centerLeft,
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                child: Icon(Icons.delete, color: Colors.white),
-              ),
-              secondaryBackground: Container(
-                color: Colors.red,
-                alignment: Alignment.centerRight,
-                padding: EdgeInsets.symmetric(horizontal: 16),
-                child: Icon(Icons.delete, color: Colors.white),
-              ),
-              onDismissed: (direction) async {
-                // Remove from list optimistically
-                final removedRes = reservation;
-                setState(() {
-                  _reservations.removeAt(index);
-                });
-                // Delete from database
-                await DatabaseService.deleteReservation(removedRes.id!);
-                // Show feedback
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Reservation deleted')),
+      // Seitenleiste für Navigation (z.B. Statistik)
+      drawer: Drawer(
+        child: ListView(
+          children: [
+            const DrawerHeader(child: Text('Menü', style: TextStyle(fontSize: 18))),
+            ListTile(
+              title: const Text('Statistiken'),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const StatisticsScreen()),
                 );
               },
-              child: ListTile(
-                title: Text(resourceName),
-                subtitle: Text(formattedDate +
-                    (reservation.description != null && reservation.description!.isNotEmpty
-                        ? " - ${reservation.description}"
-                        : "")),
-              ),
-            );
-          },
+            ),
+          ],
         ),
       ),
+      // Hauptinhalt: Liste der Reservierungen
+      body: ReservationList(onReservationChanged: _refresh),
+      // FAB zum Anlegen einer neuen Reservierung
       floatingActionButton: FloatingActionButton(
-        onPressed: _addReservation,
-        tooltip: 'Add Reservation',
-        child: Icon(Icons.add),
+        onPressed: () async {
+          // Öffne Formular ohne übergebene Reservierung (Neuanlage)
+          await Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const ReservationForm()),
+          );
+          _refresh();
+        },
+        child: const Icon(Icons.add),
       ),
     );
   }
