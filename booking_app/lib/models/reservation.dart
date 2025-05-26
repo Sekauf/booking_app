@@ -32,12 +32,15 @@ class Reservation {
   factory Reservation.fromMap(Map<String, dynamic> map) {
     // Debug-Ausgabe für Deserialierungs-Probleme
     try {
+      // ID verarbeiten
+      final id = map['id'] is int ? map['id'] as int : null;
+      
       // Überprüfen, ob Werte unter verschiedenen Spaltennamen vorhanden sind
       final int tableNumber;
       if (map.containsKey('tableNumber')) {
-        tableNumber = map['tableNumber'] as int;
+        tableNumber = map['tableNumber'] is int ? map['tableNumber'] as int : 0;
       } else if (map.containsKey('table')) {
-        tableNumber = map['table'] as int;
+        tableNumber = map['table'] is int ? map['table'] as int : 0;
       } else {
         debugPrint('Warnung: Weder tableNumber noch table gefunden in $map');
         tableNumber = 0;
@@ -75,7 +78,7 @@ class Reservation {
       }
 
       return Reservation(
-        id: map['id'] as int?,
+        id: id,
         name: map['name'] as String? ?? 'Unbekannt',
         tableNumber: tableNumber,
         dateTime: DateTime.fromMillisecondsSinceEpoch(dateTimeMs),
@@ -94,5 +97,10 @@ class Reservation {
         end: DateTime.now().add(const Duration(hours: 2)),
       );
     }
+  }
+
+  @override
+  String toString() {
+    return 'Reservation{id: $id, name: $name, tableNumber: $tableNumber}';
   }
 }
